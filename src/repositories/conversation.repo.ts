@@ -19,7 +19,8 @@ export class ConversationRepo {
         userId: params.userId,
         provider: params.provider,
         model: params.model,
-        tokenState: params.upstreamConversationId ? { upstreamConversationId: params.upstreamConversationId } : undefined
+        tokenState: params.upstreamConversationId ? { upstreamConversationId: params.upstreamConversationId } : undefined,
+        upstreamConversationId: params.upstreamConversationId
       }
     });
   }
@@ -33,7 +34,10 @@ export class ConversationRepo {
 
     return prisma.conversation.update({
       where: { id },
-      data: { tokenState }
+      data: {
+        tokenState,
+        upstreamConversationId
+      }
     });
   }
 }

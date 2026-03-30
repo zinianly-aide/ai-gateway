@@ -22,6 +22,14 @@ export class DifyProviderError extends Error {
 export class DifyAdapter implements ProviderAdapter {
   name = 'dify';
 
+  private debugLog(stage: string, meta: Record[str, any] | Record<string, any>) {
+    try {
+      console.log('[dify]', stage, JSON.stringify(meta));
+    } catch {
+      console.log('[dify]', stage, meta);
+    }
+  }
+
   constructor(
     private readonly baseUrl: string,
     private readonly apiKey: string,
@@ -36,6 +44,8 @@ export class DifyAdapter implements ProviderAdapter {
     const query = this.buildQuery(input.messages);
 
     try {
+      this.debugLog('blocking.request', { baseUrl: this.baseUrl, conversationId: input.conversationId || null, userId: input.userId, model: input.model, queryPreview: query.slice(0, 120) });
+      const startedAt = Date.now();
       const res = await axios.post(
         `${this.baseUrl}/chat-messages`,
         {
@@ -50,12 +60,14 @@ export class DifyAdapter implements ProviderAdapter {
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 120_000
+          timeout: Number(process.env.DIFY_TIMEOUT_MS || 180000)
         }
       );
 
+      this.debugLog('blocking.response', { elapsedMs: Date.now() - startedAt, status: res.status, upstreamConversationId: res.data?.conversation_id || null, hasAnswer: Boolean(res.data?.answer), answerPreview: String(res.data?.answer || '').slice(0, 120) });
       return this.mapBlockingResponse(res.data, input.model || 'dify-app');
     } catch (err) {
+      this.debugLog('blocking.error', { message: (err as any)?.message || 'unknown error' });
       throw this.normalizeError(err);
     }
   }
@@ -65,6 +77,7 @@ export class DifyAdapter implements ProviderAdapter {
 
     let response;
     try {
+      this.debugLog('stream.request', { baseUrl: this.baseUrl, conversationId: input.conversationId || null, userId: input.userId, model: input.model, queryPreview: query.slice(0, 120) });
       response = await fetch(`${this.baseUrl}/chat-messages`, {
         method: 'POST',
         headers: {
@@ -80,6 +93,7 @@ export class DifyAdapter implements ProviderAdapter {
         })
       });
     } catch (err) {
+      this.debugLog('blocking.error', { message: (err as any)?.message || 'unknown error' });
       throw this.normalizeError(err);
     }
 
@@ -125,7 +139,10 @@ export class DifyAdapter implements ProviderAdapter {
 
         if (event.event === 'message' || event.event === 'agent_message') {
           const text = event.answer ?? event.chunk ?? event.delta ?? '';
-          if (text) yield text;
+          if (text) {
+            this.debugLog('stream.chunk', { len: String(text).length, preview: String(text).slice(0, 80) });
+            yield text;
+          }
         }
 
         if (event.event === 'error') {
