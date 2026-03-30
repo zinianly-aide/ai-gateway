@@ -45,6 +45,7 @@ export async function chatRoutes(app: FastifyInstance) {
           maxTokens: body.max_tokens,
           stream: true,
           conversationId: body.conversation_id,
+          localConversationId: body.gateway_conversation_id,
           metadata: body.metadata
         });
 
@@ -77,6 +78,7 @@ export async function chatRoutes(app: FastifyInstance) {
         maxTokens: body.max_tokens,
         stream: body.stream,
         conversationId: body.conversation_id,
+        localConversationId: body.gateway_conversation_id,
         metadata: body.metadata
       });
 
@@ -102,6 +104,10 @@ export async function chatRoutes(app: FastifyInstance) {
             }
           : undefined
       };
+
+      if (result.raw?.gateway?.tokenDebug) {
+        response.token_debug = result.raw.gateway.tokenDebug;
+      }
 
       const upstreamConversationId = result.raw?.gateway?.upstreamConversationId;
       if (upstreamConversationId) {

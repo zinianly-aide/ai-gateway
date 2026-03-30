@@ -5,3 +5,4 @@ dist
 coverage
 .DS_Store
 prisma/dev.db*
+data/local-store.json

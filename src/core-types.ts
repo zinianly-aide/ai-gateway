@@ -16,6 +16,7 @@ export interface ChatRequest {
   maxTokens?: number;
   stream?: boolean;
   conversationId?: string;
+  localConversationId?: string;
   metadata?: Record<string, any>;
 }
 
