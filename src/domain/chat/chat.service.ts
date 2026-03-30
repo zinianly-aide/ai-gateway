@@ -16,25 +16,40 @@ export class ChatService {
     const messages = await this.prepareMessages(input);
     const provider = this.registry.getProvider(input.provider);
     const response = await provider.chat({ ...input, messages });
-    const persisted = await this.persistenceService.persist({
-      request: input,
-      requestMessages: messages,
-      response
-    });
-    response.raw = {
-      ...(response.raw || {}),
-      gateway: {
-        ...(response.raw?.gateway || {}),
-        persistedConversationId: persisted.conversationId,
-        upstreamConversationId: persisted.upstreamConversationId || response.raw?.gateway?.upstreamConversationId
-      }
-    };
+
+    try {
+      const persisted = await this.persistenceService.persist({
+        request: input,
+        requestMessages: messages,
+        response
+      });
+      response.raw = {
+        ...(response.raw || {}),
+        gateway: {
+          ...(response.raw?.gateway || {}),
+          persistedConversationId: persisted.conversationId,
+          upstreamConversationId: persisted.upstreamConversationId || response.raw?.gateway?.upstreamConversationId,
+          persistenceStatus: 'ok'
+        }
+      };
+    } catch (err: any) {
+      console.error('[persistence] blocking.persist.error', err?.message || err);
+      response.raw = {
+        ...(response.raw || {}),
+        gateway: {
+          ...(response.raw?.gateway || {}),
+          persistenceStatus: 'degraded',
+          persistenceError: err?.message || String(err)
+        }
+      };
+    }
+
     return response;
   }
 
   async streamChat(input: ChatRequest): Promise<{
     stream: AsyncGenerator<string, void, unknown>;
-    onFinal: () => Promise<{ persistedConversationId?: string }>;
+    onFinal: () => Promise<{ persistedConversationId?: string; persistenceStatus: 'ok' | 'degraded'; persistenceError?: string }>;
   }> {
     const messages = await this.prepareMessages(input);
     const provider = this.registry.getProvider(input.provider);
@@ -68,13 +83,23 @@ export class ChatService {
           }
         };
 
-        const persisted = await this.persistenceService.persist({
-          request: input,
-          requestMessages: messages,
-          response
-        });
-
-        return { persistedConversationId: persisted.conversationId };
+        try {
+          const persisted = await this.persistenceService.persist({
+            request: input,
+            requestMessages: messages,
+            response
+          });
+          return {
+            persistedConversationId: persisted.conversationId,
+            persistenceStatus: 'ok' as const
+          };
+        } catch (err: any) {
+          console.error('[persistence] streaming.persist.error', err?.message || err);
+          return {
+            persistenceStatus: 'degraded' as const,
+            persistenceError: err?.message || String(err)
+          };
+        }
       }
     };
   }

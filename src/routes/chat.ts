@@ -59,7 +59,10 @@ export async function chatRoutes(app: FastifyInstance) {
         }
 
         const finalInfo = await onFinal();
-        reply.raw.write(sseFinal(finalInfo.persistedConversationId ? { gateway_conversation_id: finalInfo.persistedConversationId } : {}));
+        const finalMeta: any = { persistence_status: finalInfo.persistenceStatus };
+        if (finalInfo.persistedConversationId) finalMeta.gateway_conversation_id = finalInfo.persistedConversationId;
+        if (finalInfo.persistenceError) finalMeta.persistence_error = finalInfo.persistenceError;
+        reply.raw.write(sseFinal(finalMeta));
         reply.raw.end();
         return reply;
       }
@@ -108,6 +111,13 @@ export async function chatRoutes(app: FastifyInstance) {
       const persistedConversationId = result.raw?.gateway?.persistedConversationId;
       if (persistedConversationId) {
         response.gateway_conversation_id = persistedConversationId;
+      }
+
+      if (result.raw?.gateway?.persistenceStatus) {
+        response.persistence_status = result.raw.gateway.persistenceStatus;
+      }
+      if (result.raw?.gateway?.persistenceError) {
+        response.persistence_error = result.raw.gateway.persistenceError;
       }
 
       return reply.send(response);
