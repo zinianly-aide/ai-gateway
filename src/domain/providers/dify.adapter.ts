@@ -19,15 +19,6 @@ export class DifyProviderError extends Error {
   }
 }
 
-/**
- * Dify app API adapter.
- * Maps gateway chat requests into Dify /v1/chat-messages blocking calls.
- *
- * Notes:
- * - conversation continuation uses input.conversationId
- * - OpenAI-style usage is mapped from Dify metadata.usage when available
- * - provider errors are normalized for upper-layer OpenAI-style error responses
- */
 export class DifyAdapter implements ProviderAdapter {
   name = 'dify';
 
@@ -63,53 +54,125 @@ export class DifyAdapter implements ProviderAdapter {
         }
       );
 
-      const data = res.data;
-      const usage = this.mapUsage(data?.metadata?.usage);
-      const content = data.answer || '';
-      const responseId = data.message_id || data.task_id || data.conversation_id || crypto.randomUUID();
-
-      return {
-        id: responseId,
-        provider: this.name,
-        model: input.model || 'dify-app',
-        content,
-        finishReason: 'stop',
-        usage,
-        raw: {
-          ...data,
-          gateway: {
-            upstreamConversationId: data.conversation_id,
-            upstreamMessageId: data.message_id,
-            upstreamTaskId: data.task_id
-          }
-        }
-      };
+      return this.mapBlockingResponse(res.data, input.model || 'dify-app');
     } catch (err) {
       throw this.normalizeError(err);
     }
   }
 
+  async *streamChat(input: ChatRequest): AsyncGenerator<string, void, unknown> {
+    const query = this.buildQuery(input.messages);
+
+    let response;
+    try {
+      response = await fetch(`${this.baseUrl}/chat-messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: input.metadata?.inputs ?? {},
+          query,
+          response_mode: 'streaming',
+          conversation_id: input.conversationId || undefined,
+          user: `${this.userPrefix}:${input.userId}`
+        })
+      });
+    } catch (err) {
+      throw this.normalizeError(err);
+    }
+
+    if (!response.ok || !response.body) {
+      let details: any = {};
+      try {
+        details = await response.json();
+      } catch {}
+      throw new DifyProviderError(details?.message || `Dify streaming failed: HTTP ${response.status}`, {
+        statusCode: response.status,
+        type: response.status === 429 ? 'rate_limit_error' : response.status >= 500 ? 'api_error' : 'provider_error',
+        code: details?.code,
+        details
+      });
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for await (const chunk of response.body as any) {
+      buffer += decoder.decode(chunk, { stream: true });
+
+      while (true) {
+        const idx = buffer.indexOf('\n\n');
+        if (idx === -1) break;
+
+        const rawEvent = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+
+        const lines = rawEvent.split('\n').filter(Boolean);
+        const dataLines = lines.filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim());
+        if (!dataLines.length) continue;
+
+        const payload = dataLines.join('\n');
+        if (payload === '[DONE]') return;
+
+        let event: any;
+        try {
+          event = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+
+        if (event.event === 'message' || event.event === 'agent_message') {
+          const text = event.answer ?? event.chunk ?? event.delta ?? '';
+          if (text) yield text;
+        }
+
+        if (event.event === 'error') {
+          throw new DifyProviderError(event.message || 'Dify streaming error', {
+            statusCode: 500,
+            type: 'provider_error',
+            code: event.code,
+            details: event
+          });
+        }
+      }
+    }
+  }
+
   private buildQuery(messages: ChatRequest['messages']): string {
-    return messages
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join('\n\n');
+    return messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+  }
+
+  private mapBlockingResponse(data: any, model: string): ChatResponse {
+    const usage = this.mapUsage(data?.metadata?.usage);
+    const content = data.answer || '';
+    const responseId = data.message_id || data.task_id || data.conversation_id || crypto.randomUUID();
+
+    return {
+      id: responseId,
+      provider: this.name,
+      model,
+      content,
+      finishReason: 'stop',
+      usage,
+      raw: {
+        ...data,
+        gateway: {
+          upstreamConversationId: data.conversation_id,
+          upstreamMessageId: data.message_id,
+          upstreamTaskId: data.task_id
+        }
+      }
+    };
   }
 
   private mapUsage(usage: any): ChatResponse['usage'] | undefined {
     if (!usage || typeof usage !== 'object') return undefined;
-
-    const inputTokens = Number(
-      usage.prompt_tokens ?? usage.input_tokens ?? usage.total_tokens ?? 0
-    );
-    const outputTokens = Number(
-      usage.completion_tokens ?? usage.output_tokens ?? 0
-    );
-    const totalTokens = Number(
-      usage.total_tokens ?? inputTokens + outputTokens
-    );
-
+    const inputTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? usage.total_tokens ?? 0);
+    const outputTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+    const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens);
     if (!Number.isFinite(totalTokens)) return undefined;
-
     return {
       inputTokens: Number.isFinite(inputTokens) ? inputTokens : 0,
       outputTokens: Number.isFinite(outputTokens) ? outputTokens : 0,
@@ -121,11 +184,8 @@ export class DifyAdapter implements ProviderAdapter {
     const e = err as AxiosError<any>;
     const statusCode = e.response?.status ?? 500;
     const data = e.response?.data ?? {};
-
-    const providerCode =
-      data.code || data.error_code || data.status || undefined;
-    const providerMessage =
-      data.message || data.msg || data.error || e.message || 'Dify request failed';
+    const providerCode = data.code || data.error_code || data.status || undefined;
+    const providerMessage = data.message || data.msg || data.error || e.message || 'Dify request failed';
 
     let type = 'provider_error';
     if (statusCode === 400) type = 'invalid_request_error';

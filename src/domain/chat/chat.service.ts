@@ -11,6 +11,21 @@ export class ChatService {
   ) {}
 
   async chat(input: ChatRequest): Promise<ChatResponse> {
+    const messages = await this.prepareMessages(input);
+    const provider = this.registry.getProvider(input.provider);
+    return provider.chat({ ...input, messages });
+  }
+
+  async streamChat(input: ChatRequest): Promise<AsyncGenerator<string, void, unknown>> {
+    const messages = await this.prepareMessages(input);
+    const provider = this.registry.getProvider(input.provider);
+    if (!provider.streamChat) {
+      throw new Error(`Provider ${input.provider} does not support streaming`);
+    }
+    return provider.streamChat({ ...input, messages });
+  }
+
+  private async prepareMessages(input: ChatRequest): Promise<ChatMessage[]> {
     let messages: ChatMessage[] = [...input.messages];
     const estimatedTokens = this.tokenCounter.countMessages(input.model, messages);
 
@@ -23,7 +38,6 @@ export class ChatService {
       ];
     }
 
-    const provider = this.registry.getProvider(input.provider);
-    return provider.chat({ ...input, messages });
+    return messages;
   }
 }
