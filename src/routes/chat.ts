@@ -35,10 +35,11 @@ export async function chatRoutes(app: FastifyInstance) {
       const body = req.body as any;
 
       if (body.stream) {
+        const routed = app.modelRouter.resolve({ provider: body.provider, model: body.model });
         const { stream, onFinal } = await app.chatService.streamChat({
           userId: req.user.id,
-          provider: body.provider || 'openai',
-          model: body.model,
+          provider: routed.provider,
+          model: routed.model,
           messages: body.messages,
           temperature: body.temperature,
           maxTokens: body.max_tokens,
@@ -63,10 +64,11 @@ export async function chatRoutes(app: FastifyInstance) {
         return reply;
       }
 
+      const routed = app.modelRouter.resolve({ provider: body.provider, model: body.model });
       const result = await app.chatService.chat({
         userId: req.user.id,
-        provider: body.provider || 'openai',
-        model: body.model,
+        provider: routed.provider,
+        model: routed.model,
         messages: body.messages,
         temperature: body.temperature,
         maxTokens: body.max_tokens,

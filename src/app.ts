@@ -11,11 +11,13 @@ import { CompressionService } from './domain/chat/compression.service.js';
 import { ChatService } from './domain/chat/chat.service.js';
 import { PersistenceService } from './domain/usage/persistence.service.js';
 import { CostService } from './domain/usage/cost.service.js';
+import { ModelRouterService } from './domain/routing/model-router.service.js';
 import { chatRoutes } from './routes/chat.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { conversationRoutes } from './routes/conversations.js';
 import { usageRoutes } from './routes/usage.js';
+import { modelRoutes } from './routes/models.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -40,8 +42,10 @@ export async function buildApp() {
   const costService = new CostService();
   const persistenceService = new PersistenceService(tokenCounter, costService);
   const chatService = new ChatService(registry, tokenCounter, compressionService, persistenceService);
+  const modelRouter = new ModelRouterService();
 
   app.decorate('chatService', chatService);
+  app.decorate('modelRouter', modelRouter);
   app.addHook('preHandler', async (req: any) => {
     const auth = req.headers.authorization;
     if (auth?.startsWith('Bearer ')) {
@@ -57,6 +61,7 @@ export async function buildApp() {
   await healthRoutes(app);
   await authRoutes(app);
   await chatRoutes(app);
+  await modelRoutes(app);
   await conversationRoutes(app);
   await usageRoutes(app);
 

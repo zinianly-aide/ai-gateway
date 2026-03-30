@@ -84,3 +84,13 @@ Responses may include `gateway_conversation_id` for the local persisted conversa
 - `GET /v1/usage` get local usage summary and recent records
 
 Streaming requests now persist the final assistant output after stream completion.
+
+## Model routing
+
+The gateway can auto-resolve provider from model when `provider` is omitted:
+
+- `dify-app` or `dify/*` -> `dify`
+- `claude*` -> `anthropic`
+- otherwise -> `openai`
+
+This makes it easier for OpenAI-compatible clients (like opencode-style clients) to point directly at the gateway.
