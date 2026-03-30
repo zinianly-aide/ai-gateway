@@ -22,7 +22,7 @@ export class DifyProviderError extends Error {
 export class DifyAdapter implements ProviderAdapter {
   name = 'dify';
 
-  private debugLog(stage: string, meta: Record[str, any] | Record<string, any>) {
+  private debugLog(stage: string, meta: Record<string, any>) {
     try {
       console.log('[dify]', stage, JSON.stringify(meta));
     } catch {
