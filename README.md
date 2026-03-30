@@ -55,3 +55,10 @@ The gateway will forward to Dify `/v1/chat-messages` in blocking mode.
 - Usage/cost persistence
 - Streaming support
 - Provider fallback
+
+## Dify bridge behavior
+
+- `conversation_id` from gateway request is forwarded to Dify `conversation_id`
+- Dify returned `conversation_id` is exposed back in gateway response
+- Dify `metadata.usage` is mapped into OpenAI-style `usage`
+- Dify upstream errors are normalized into OpenAI-style `error` payloads
