@@ -15,14 +15,14 @@ function sseChunk(content: string) {
   })}\n\n`;
 }
 
-function sseDone() {
+function sseFinal(extra?: Record<string, any>) {
   return `data: ${JSON.stringify({
     id: `chatcmpl-${Date.now()}`,
     object: 'chat.completion.chunk',
     choices: [
       {
         index: 0,
-        delta: {},
+        delta: extra || {},
         finish_reason: 'stop'
       }
     ]
@@ -35,7 +35,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const body = req.body as any;
 
       if (body.stream) {
-        const stream = await app.chatService.streamChat({
+        const { stream, onFinal } = await app.chatService.streamChat({
           userId: req.user.id,
           provider: body.provider || 'openai',
           model: body.model,
@@ -57,7 +57,8 @@ export async function chatRoutes(app: FastifyInstance) {
           reply.raw.write(sseChunk(chunk));
         }
 
-        reply.raw.write(sseDone());
+        const finalInfo = await onFinal();
+        reply.raw.write(sseFinal(finalInfo.persistedConversationId ? { gateway_conversation_id: finalInfo.persistedConversationId } : {}));
         reply.raw.end();
         return reply;
       }

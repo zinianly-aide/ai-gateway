@@ -32,13 +32,51 @@ export class ChatService {
     return response;
   }
 
-  async streamChat(input: ChatRequest): Promise<AsyncGenerator<string, void, unknown>> {
+  async streamChat(input: ChatRequest): Promise<{
+    stream: AsyncGenerator<string, void, unknown>;
+    onFinal: () => Promise<{ persistedConversationId?: string }>;
+  }> {
     const messages = await this.prepareMessages(input);
     const provider = this.registry.getProvider(input.provider);
     if (!provider.streamChat) {
       throw new Error(`Provider ${input.provider} does not support streaming`);
     }
-    return provider.streamChat({ ...input, messages });
+
+    const rawStream = provider.streamChat({ ...input, messages });
+    let fullText = '';
+
+    async function* collectingStream() {
+      for await (const chunk of rawStream) {
+        fullText += chunk;
+        yield chunk;
+      }
+    }
+
+    return {
+      stream: collectingStream(),
+      onFinal: async () => {
+        const response: ChatResponse = {
+          id: crypto.randomUUID(),
+          provider: input.provider,
+          model: input.model,
+          content: fullText,
+          finishReason: 'stop',
+          raw: {
+            gateway: {
+              upstreamConversationId: input.conversationId
+            }
+          }
+        };
+
+        const persisted = await this.persistenceService.persist({
+          request: input,
+          requestMessages: messages,
+          response
+        });
+
+        return { persistedConversationId: persisted.conversationId };
+      }
+    };
   }
 
   private async prepareMessages(input: ChatRequest): Promise<ChatMessage[]> {

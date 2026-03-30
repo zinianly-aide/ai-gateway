@@ -14,6 +14,8 @@ import { CostService } from './domain/usage/cost.service.js';
 import { chatRoutes } from './routes/chat.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
+import { conversationRoutes } from './routes/conversations.js';
+import { usageRoutes } from './routes/usage.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -55,6 +57,8 @@ export async function buildApp() {
   await healthRoutes(app);
   await authRoutes(app);
   await chatRoutes(app);
+  await conversationRoutes(app);
+  await usageRoutes(app);
 
   return app;
 }

@@ -76,3 +76,11 @@ Blocking chat requests now persist:
 - usage records
 
 Responses may include `gateway_conversation_id` for the local persisted conversation id.
+
+## Query APIs
+
+- `GET /v1/conversations` list recent local conversations
+- `GET /v1/conversations/:id` get one conversation with messages
+- `GET /v1/usage` get local usage summary and recent records
+
+Streaming requests now persist the final assistant output after stream completion.
