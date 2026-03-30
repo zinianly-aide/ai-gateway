@@ -102,6 +102,11 @@ export async function chatRoutes(app: FastifyInstance) {
         response.conversation_id = upstreamConversationId;
       }
 
+      const persistedConversationId = result.raw?.gateway?.persistedConversationId;
+      if (persistedConversationId) {
+        response.gateway_conversation_id = persistedConversationId;
+      }
+
       return reply.send(response);
     } catch (err: any) {
       if (err instanceof DifyProviderError) {

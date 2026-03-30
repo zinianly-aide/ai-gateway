@@ -66,3 +66,13 @@ The gateway will forward to Dify `/v1/chat-messages` in blocking mode.
 ## Dify streaming
 
 Set `stream: true` in `/v1/chat/completions` and the gateway will proxy Dify streaming responses as OpenAI-style SSE chunks.
+
+## Persistence (MVP)
+
+Blocking chat requests now persist:
+
+- local conversation records
+- request/assistant messages
+- usage records
+
+Responses may include `gateway_conversation_id` for the local persisted conversation id.

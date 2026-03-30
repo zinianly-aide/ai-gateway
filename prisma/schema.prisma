@@ -38,6 +38,7 @@ model Conversation {
   model      String
   summary    String?
   tokenState Json?
+  upstreamConversationId String?
   user       User      @relation(fields: [userId], references: [id])
   messages   Message[]
   createdAt  DateTime  @default(now())

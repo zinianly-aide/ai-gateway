@@ -9,6 +9,8 @@ import { DifyAdapter } from './domain/providers/dify.adapter.js';
 import { TokenCounterService } from './domain/usage/token-counter.service.js';
 import { CompressionService } from './domain/chat/compression.service.js';
 import { ChatService } from './domain/chat/chat.service.js';
+import { PersistenceService } from './domain/usage/persistence.service.js';
+import { CostService } from './domain/usage/cost.service.js';
 import { chatRoutes } from './routes/chat.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
@@ -33,7 +35,9 @@ export async function buildApp() {
 
   const tokenCounter = new TokenCounterService();
   const compressionService = new CompressionService();
-  const chatService = new ChatService(registry, tokenCounter, compressionService);
+  const costService = new CostService();
+  const persistenceService = new PersistenceService(tokenCounter, costService);
+  const chatService = new ChatService(registry, tokenCounter, compressionService, persistenceService);
 
   app.decorate('chatService', chatService);
   app.addHook('preHandler', async (req: any) => {
