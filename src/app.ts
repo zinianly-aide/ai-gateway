@@ -5,6 +5,7 @@ import fastifyJwt from '@fastify/jwt';
 import { ProviderRegistry } from './domain/providers/provider-registry.js';
 import { OpenAIAdapter } from './domain/providers/openai/openai.adapter.js';
 import { AnthropicAdapter } from './domain/providers/anthropic/anthropic.adapter.js';
+import { DifyAdapter } from './domain/providers/dify.adapter.js';
 import { TokenCounterService } from './domain/usage/token-counter.service.js';
 import { CompressionService } from './domain/chat/compression.service.js';
 import { ChatService } from './domain/chat/chat.service.js';
@@ -25,6 +26,9 @@ export async function buildApp() {
   }
   if (process.env.ANTHROPIC_API_KEY) {
     registry.registerProvider(new AnthropicAdapter(process.env.ANTHROPIC_API_KEY));
+  }
+  if (process.env.DIFY_BASE_URL && process.env.DIFY_API_KEY) {
+    registry.registerProvider(new DifyAdapter(process.env.DIFY_BASE_URL, process.env.DIFY_API_KEY));
   }
 
   const tokenCounter = new TokenCounterService();
