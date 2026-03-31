@@ -1,5 +1,6 @@
 import { DifyProviderError } from '../domain/providers/dify.adapter.js';
 import type { FastifyInstance } from 'fastify';
+import { normalizeChatMessages } from '../domain/chat/message-normalizer.service.js';
 
 function sseChunk(content: string) {
   return `data: ${JSON.stringify({
@@ -40,7 +41,7 @@ export async function chatRoutes(app: FastifyInstance) {
           userId: req.user.id,
           provider: routed.provider,
           model: routed.model,
-          messages: body.messages,
+          messages: normalizeChatMessages(body.messages),
           temperature: body.temperature,
           maxTokens: body.max_tokens,
           stream: true,
@@ -73,7 +74,7 @@ export async function chatRoutes(app: FastifyInstance) {
         userId: req.user.id,
         provider: routed.provider,
         model: routed.model,
-        messages: body.messages,
+        messages: normalizeChatMessages(body.messages),
         temperature: body.temperature,
         maxTokens: body.max_tokens,
         stream: body.stream,

@@ -4,6 +4,7 @@ import { TokenCounterService } from '../usage/token-counter.service.js';
 import { CompressionService } from './compression.service.js';
 import { PersistenceService } from '../usage/persistence.service.js';
 import { LocalStoreService } from '../usage/local-store.service.js';
+import { normalizeChatMessages } from './message-normalizer.service.js';
 
 export class ChatService {
   constructor(
@@ -133,7 +134,7 @@ export class ChatService {
       content: m.content
     }));
 
-    const incomingMessages: ChatMessage[] = [...input.messages];
+    const incomingMessages: ChatMessage[] = normalizeChatMessages(input.messages);
     const mergedMessages = historyMessages.length
       ? this.mergeHistoricalAndIncomingMessages(historyMessages, incomingMessages)
       : incomingMessages;

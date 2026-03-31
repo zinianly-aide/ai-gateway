@@ -158,7 +158,9 @@ export class DifyAdapter implements ProviderAdapter {
   }
 
   private buildQuery(messages: ChatRequest['messages']): string {
-    return messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+    return messages
+      .map((m) => `${m.role.toUpperCase()}: ${typeof m.content === 'string' ? m.content : String(m.content ?? '')}`)
+      .join('\n\n');
   }
 
   private mapBlockingResponse(data: any, model: string): ChatResponse {
